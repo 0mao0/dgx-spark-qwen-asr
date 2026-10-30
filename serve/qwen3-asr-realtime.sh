@@ -16,8 +16,10 @@ MODEL_DIR="${MODEL_DIR:-/models/Qwen3-ASR-0.6B}"
 IMAGE="${IMAGE:-vllm/vllm-openai:v0.32.0}"
 PORT="${PORT:-18101}"
 
+SEG="${SEG:-5.0}"   # realtime segment duration in seconds (2.0 = faster first partial)
 docker rm -f qwen3-asr-realtime 2>/dev/null || true
 docker run -d --gpus all --name qwen3-asr-realtime --restart unless-stopped \
+  -e QWEN_RT_SEG="$SEG" \
   -v "$MODEL_DIR":/models/model:ro \
   -v "$HERE/patches/qwen3_asr_realtime.py":/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_asr_realtime.py:ro \
   -v "$HERE/patches/scheduler.py":/usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py:ro \

@@ -216,7 +216,7 @@ class Qwen3ASRRealtimeGeneration(Qwen3ASRForConditionalGeneration, SupportsRealt
         tokenizer = cached_tokenizer_from_config(model_config)
 
         # Use a small segment size for low-latency streaming.
-        segment_duration_s = 5.0
+        segment_duration_s = float(__import__("os").environ.get("QWEN_RT_SEG", "5.0"))
         audio_config = model_config.hf_config.thinker_config.audio_config
         buffer = Qwen3ASRRealtimeBuffer(
             sampling_rate=sampling_rate,

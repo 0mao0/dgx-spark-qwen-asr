@@ -54,7 +54,7 @@ Client side is the standard OpenAI Realtime-style subset:
 
 1. `session.update` → `{"type":"session.update","model":"qwen3-asr"}`
 2. `input_audio_buffer.append` with base64 PCM16 mono 16 kHz
-3. `input_audio_buffer.commit` every ~5 s of audio (starts one segment);
+3. `input_audio_buffer.commit` every ~2-5 s of audio (starts one segment);
    a final `{"commit","final":true}` ends the stream
 
 Server side, after the proxy: `{"text": <cumulative>, "delta": <piece>,
@@ -64,8 +64,13 @@ segment. First partial arrives ~0.1 s after the first 5 s of audio on GB10;
 
 ## Notes
 
-- 5 s is the segment unit: shorter chunks (2 s) produce fragmented,
-  over-punctuated text.
+- Realtime segment duration is configurable via the `QWEN_RT_SEG` env in
+  the serve script (`SEG=2.0 ./serve/qwen3-asr-realtime.sh`, default 5.0).
+  Quality vs latency on dictation audio (measured on AISHELL clips):
+  5 s = clean baseline; 3 s ≈ clean; 2 s = whole sentences with minor
+  boundary slips, first partial ~2.3 s; 1 s = 1–2-character fragments,
+  unusable. "Word-at-a-time under ~1 s" is not achievable with this
+  model's window decoding — it is a model property, not a patch gap.
 - The patches bind-mount into `vllm/vllm-openai:v0.32.0`. They are pinned to
   that image; other vLLM versions need a rebase of `patches/scheduler.py`.
 - The two patch files are derived from vLLM sources and carry the same
