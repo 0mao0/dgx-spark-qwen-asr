@@ -68,7 +68,13 @@ async def handle(client):
 
     async def u2c():
         seg = SegFilter()
-        async with websockets.connect(UPSTREAM, max_size=2**24) as up:
+        # Keepalive pings are off on both legs on purpose: the engine's
+        # default 20 s ping window kills long realtime sessions (~40 s in,
+        # close code 1011) because one generation turn can run longer than
+        # the timeout. Verified with a single 190 s session, no drop.
+        async with websockets.connect(UPSTREAM, max_size=2**24,
+                                      ping_interval=None,
+                                      ping_timeout=None) as up:
 
             async def c2u():
                 async for msg in client:
@@ -114,7 +120,8 @@ async def handle(client):
 
 async def main():
     async with websockets.serve(handle, LISTEN_HOST, LISTEN_PORT,
-                                max_size=2**24):
+                                max_size=2**24,
+                                ping_interval=None, ping_timeout=None):
         print(f"rt proxy up on ws://{LISTEN_HOST}:{LISTEN_PORT}/", flush=True)
         await asyncio.Future()
 

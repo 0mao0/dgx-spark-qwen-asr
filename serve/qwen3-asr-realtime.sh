@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Launch vLLM serving Qwen3-ASR-0.6B with realtime WS support.
-# Both patched engine files are bind-mounted read-only into the container,
+# All patched engine files are bind-mounted read-only into the container,
 # so no custom image build is needed.
 #
 # Usage:
@@ -23,6 +23,7 @@ docker run -d --gpus all --name qwen3-asr-realtime --restart unless-stopped \
   -v "$MODEL_DIR":/models/model:ro \
   -v "$HERE/patches/qwen3_asr_realtime.py":/usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/qwen3_asr_realtime.py:ro \
   -v "$HERE/patches/scheduler.py":/usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/scheduler.py:ro \
+  -v "$HERE/patches/connection.py":/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/speech_to_text/realtime/connection.py:ro \
   -p "127.0.0.1:${PORT}:18000" \
   "$IMAGE" \
   --model /models/model --served-model-name qwen3-asr \

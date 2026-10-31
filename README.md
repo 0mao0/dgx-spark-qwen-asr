@@ -16,6 +16,8 @@ make the output unusable. Each is fixed by one component here:
 | Later segments repeat earlier text | scheduler appends previous output tokens into the next prompt | `patches/scheduler.py` — port of vLLM PR #56218 (opt-out of session carry) |
 | Last ~2 s of every segment is dropped | audio buffer has no overlap/carry | `patches/qwen3_asr_realtime.py` — port of vLLM PR #62487 (PCM16-style sample carry) |
 | Every segment starts with `language <L><asr_text>` header text | the realtime serving path never runs `post_process_output` | `proxy/ws_proxy.py` — streaming inline header stripper |
+| A commit arriving while a round runs is silently dropped, and the audio queue is cleared at round end — up to half the speech disappears | connection layer drops overlapping commits and discards unconsumed audio | `patches/connection.py` — keep the audio queued and chain a follow-up round over the leftover |
+| Long sessions die at ~40 s with close code 1011 | keepalive pings on both proxy legs use the 20 s default timeout, shorter than one generation turn | `proxy/ws_proxy.py` — pings off on both legs (verified with a single 190 s session) |
 
 The scheduler patch also makes the policy explicit per model
 (`realtime_carries_context`), so non-realtime models keep vLLM default
@@ -27,6 +29,7 @@ behaviour.
 patches/                     engine files to bind-mount into the vLLM container
   scheduler.py               vLLM 0.32.0 scheduler.py + PR #56218 port
   qwen3_asr_realtime.py      vLLM 0.32.0 realtime model + PR #62487 port
+  connection.py              vLLM 0.32.0 realtime connection + no-drop/chaining fix
 serve/qwen3-asr-realtime.sh  docker run launcher (no image build needed)
 proxy/ws_proxy.py            WebSocket proxy: strips headers, frames like HTTP streaming
 examples/client.py           minimal wav-over-WS client
@@ -75,6 +78,14 @@ segment. First partial arrives ~0.1 s after the first 5 s of audio on GB10;
   that image; other vLLM versions need a rebase of `patches/scheduler.py`.
 - The two patch files are derived from vLLM sources and carry the same
   Apache-2.0 license header.
+- Known residual at `SEG=2.0`: segments can duplicate a few words at their
+  boundary (measured as ~19 % CER made entirely of repeated insertions, zero
+  deletions). Cause is structural — fixed 2 s segmentation tearing words plus
+  generation slower than speech — not something these patches can fix. For
+  dictation-grade streaming under 2 s latency, a CPU-side streaming model
+  (e.g. paraformer, see [dgx-spark-paraformer-asr](https://github.com/0mao0/dgx-spark-paraformer-asr))
+  currently wins on both latency and accuracy; keep this engine for batch
+  file transcription where its GPU throughput pays off.
 - This is not an official vLLM feature and not a fork: it is a working
   configuration + patches, tracked against upstream PRs #62487, #56218.
 
